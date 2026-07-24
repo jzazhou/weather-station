@@ -1,0 +1,17 @@
+[Unit]
+Description=Aesthetic Raspberry Pi Weather Station
+After=network-online.target
+Wants=network-online.target
+ 
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/weather_station
+ExecStart=/home/pi/weather_station/venv/bin/python /home/pi/weather_station/station.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+ 
+[Install]
+WantedBy=multi-user.target
