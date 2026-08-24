@@ -1,0 +1,20 @@
+# Weather Station dependencies
+# Install into a virtual environment:
+#   python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+
+# CircuitPython hardware abstraction — provides the `board` module and
+# the I2C bus object that sensors.py uses on the Pi's GPIO header.
+adafruit-blinka>=8.0.0
+
+# Driver for the BME688. The library is named for the BME680; the 688 is
+# pin- and register-compatible, so this is the correct package.
+adafruit-circuitpython-bme680>=3.7.0
+
+# Image composition — the entire UI is drawn with Pillow.
+Pillow>=10.0.0
+
+# Vectorised RGB888 -> RGB565 conversion in display.py.
+numpy>=1.24.0
+
+# OpenWeatherMap HTTP client.
+requests>=2.31.0
