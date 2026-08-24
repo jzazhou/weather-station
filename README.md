@@ -252,7 +252,3 @@ The unit file assumes the project lives at `/home/pi/weather_station` and runs a
 - **Pressure-trend indicator** — rising/falling arrow from the pressure history, a genuinely useful short-term forecast signal
 - **Hardware backlight dimming** — PWM on the BL pin (GPIO 18) instead of the current software brightness multiply, for real power savings overnight
 - **Multi-screen rotation** — a forecast view and an air-quality-history view, cycling on a timer
-
----
-
-Built by a first-year Electrical and Computer Engineering student at Cornell University as a first hands-on embedded systems project.
