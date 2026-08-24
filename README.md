@@ -4,7 +4,7 @@ A always-on desktop weather station built on a Raspberry Pi 4 — indoor air rea
 
 ![The weather station UI](preview.png)
 
-Every pixel on that screen is drawn by `ui.py` and pushed straight to the framebuffer. There is no desktop environment, no Tkinter, no web view — just Pillow composing a 480×320 image and a converter writing raw RGB565 bytes to `/dev/fb0`.
+Every pixel on that screen is drawn by `ui.py` and pushed straight to the framebuffer. Pillow composes a 480×320 image and a converter writing raw RGB565 bytes to `/dev/fb0`.
 
 ---
 
