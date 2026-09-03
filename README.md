@@ -1,156 +1,124 @@
+[README.md](https://github.com/user-attachments/files/31809488/README.md)
 # Weather Station
 
-A always-on desktop weather station built on a Raspberry Pi 4 — indoor air readings from a Bosch BME688 sensor, outdoor conditions from the OpenWeatherMap API, drawn to a 3.5" SPI LCD through Pillow UI.
+An always-on desktop weather station built on a Raspberry Pi 4. It reads indoor air conditions from a Bosch BME688 sensor, pulls outdoor weather from the OpenWeatherMap API, and shows both on a small colour LCD.
 
 ![The weather station UI](preview.png)
 
-Every pixel on that screen is drawn by `ui.py` and pushed straight to the framebuffer. Pillow composes a 480×320 image and a converter writing raw RGB565 bytes to `/dev/fb0`.
-
----
-
-## Contents
-
-- [What it does](#what-it-does)
-- [How it works](#how-it-works)
-- [Repository layout](#repository-layout)
-- [Hardware](#hardware)
-- [Wiring](#wiring)
-- [Setup](#setup)
-- [Configuration](#configuration)
-- [Running it](#running-it)
-- [Design notes](#design-notes)
-- [Roadmap](#roadmap)
+The interface is drawn from scratch. There's no desktop environment and no GUI library — the code builds each frame as an image with Pillow and writes it straight to the screen.
 
 ---
 
 ## What it does
 
-**Indoor**, read from the BME688 over I²C every 10 seconds:
+**Indoor** — read from the BME688 sensor every 10 seconds:
 
 - Temperature (°C)
-- Relative humidity (%)
+- Humidity (%)
 - Barometric pressure (hPa)
-- Air quality, derived from the sensor's gas-resistance reading and labelled Excellent / Good / Fair / Poor
+- Air quality, rated Excellent / Good / Fair / Poor based on the sensor's gas reading
 
-**Outdoor**, fetched from OpenWeatherMap every 10 minutes:
+**Outdoor** — fetched from OpenWeatherMap every 10 minutes:
 
-- Current temperature and feels-like temperature
-- Condition description with a matching hand-drawn icon
+- Temperature and feels-like temperature
+- Weather description, with a matching icon
 - Wind speed and humidity
 
-**Plus:**
+**Also:**
 
-- Live clock and date
-- Per-source freshness timestamps, so a stale reading is visible rather than silently wrong
-- Automatic overnight dimming to 45% brightness between 10pm and 7am
-- Auto-starts on boot as a systemd service and runs headless — no keyboard, no mouse, no monitor
-
----
-
-## How it works
-
-Three concerns run independently so that a slow sensor read or a dead network connection can never freeze the screen.
-
-```mermaid
-flowchart LR
-    A["sensor_worker thread<br/>BME688 via I²C<br/>every 10s"] --> C
-    B["api_worker thread<br/>OpenWeatherMap<br/>every 10min"] --> C
-    C["DataStore<br/>lock-protected dict"] --> D
-    D["main loop<br/>renders on change"] --> E["ui.render()<br/>Pillow → 480×320 RGB"]
-    E --> F["display.show()<br/>RGB888 → RGB565 → /dev/fb0"]
-```
-
-Two daemon threads poll their data sources on their own schedules and write into a shared `DataStore`. The store guards every read and write with a `threading.Lock`, so the render loop always sees a coherent snapshot rather than a half-updated dict.
-
-The main loop wakes ten times a second but only redraws when something visible has actually changed. It builds a small fingerprint — the current `HH:MM`, plus the two update timestamps — and compares it to the last frame it drew. Since the clock only displays minutes, redrawing on every tick would push roughly 600 identical frames per minute at the framebuffer for nothing. On a 2GB Pi that headroom is worth keeping.
-
-Failure is handled by returning `None` rather than raising. A failed sensor read or a network timeout leaves the last good value on screen with its original timestamp, and the UI renders a `—` placeholder for anything that has never arrived. The station keeps running through a Wi-Fi dropout and shows honestly stale data instead of crashing.
+- Clock and date
+- Timestamps showing when each reading last updated
+- Screen dims to 45% brightness between 10pm and 7am
+- Starts automatically on boot and runs with no keyboard or monitor attached
 
 ---
 
-## Repository layout
+## Files
 
-| File | Role |
+| File | What it does |
 |---|---|
-| `station.py` | Entry point. Spawns the worker threads and runs the render loop. |
-| `data_store.py` | Thread-safe container for the latest indoor and outdoor readings. |
-| `sensors.py` | BME688 I²C reads and the gas-resistance → air-quality mapping. |
-| `weather_api.py` | OpenWeatherMap client with timeout and error handling. Runnable standalone to test the API. |
-| `ui.py` | The whole interface — layout, cards, typography, dimming. Runnable standalone to write `preview.png`. |
-| `icons.py` | Weather icons drawn from scratch with Pillow primitives. |
-| `theme.py` | Colour palette and font definitions. The single place to restyle the UI. |
-| `display.py` | RGB888 → RGB565 conversion and the framebuffer write. Runnable standalone as a colour-bar test. |
-| `test_display.py` | Standalone framebuffer test — writes shapes and text straight to `/dev/fb0` to prove the LCD works before any of the UI exists. |
-| `fonts/` | Quicksand (Light / Medium / Bold). |
-| `weather-station.service` | systemd unit for auto-start on boot. |
+| `station.py` | Starts everything and runs the main loop |
+| `data_store.py` | Holds the latest indoor and outdoor readings |
+| `sensors.py` | Reads the BME688 and rates the air quality |
+| `weather_api.py` | Calls the OpenWeatherMap API |
+| `ui.py` | Draws the whole interface |
+| `icons.py` | Draws the weather icons |
+| `theme.py` | All the colours and fonts |
+| `display.py` | Sends the finished image to the LCD |
+| `test_display.py` | Test script for checking the LCD works |
+| `fonts/` | Quicksand font files |
+| `weather-station.service` | Makes it start on boot |
 
-Three modules run standalone for testing, which is what made the project tractable to build in stages:
+Three files can be run on their own for testing:
 
 ```bash
-python weather_api.py   # prints a live outdoor fetch, no hardware needed
-python ui.py            # writes preview.png from sample data, no hardware needed
-python display.py       # colour bars + gradient on the LCD, no sensor needed
+python weather_api.py   # prints the current outdoor weather
+python ui.py            # saves preview.png using fake data
+python display.py       # shows colour bars on the LCD
 ```
 
 ---
 
 ## Hardware
 
-| Component | Part |
+| Part | Component |
 |---|---|
 | Computer | Raspberry Pi 4 Model B (2GB), Raspberry Pi OS 64-bit |
-| Environmental sensor | Bosch BME688 breakout — Adafruit #5046 |
+| Sensor | Bosch BME688 breakout (Adafruit #5046) |
 | Display | Waveshare 3.5" IPS LCD, SPI, 480×320 |
 | Storage | 32GB microSD, Class 10 |
 | Power | USB-C 5V / 3A |
-| Prototyping | Breadboard and jumper wires |
+| Other | Breadboard and jumper wires |
 
 ---
 
 ## Wiring
 
-All pin numbers below are **physical board pins** — counted along the 40-pin header, not BCM/GPIO numbers.
+These are **physical pin numbers** — counted along the 40-pin header, not GPIO numbers.
 
-### BME688 → Raspberry Pi (I²C)
+### BME688 (I²C)
 
-| BME688 | Pi physical pin | Function |
+| BME688 | Pi pin | What it's for |
 |---|---|---|
 | VIN | 1 | 3.3V power |
 | GND | 6 | Ground |
-| SDA | 3 | I²C data (GPIO 2) |
-| SCL | 5 | I²C clock (GPIO 3) |
+| SDA | 3 | Data |
+| SCL | 5 | Clock |
 
-I²C address: `0x77`. Confirm the sensor is present with `i2cdetect -y 1` — it should show `77` in the grid.
+The sensor's address is `0x77`. Run `i2cdetect -y 1` to check it's connected — `77` should appear in the grid.
 
-### Waveshare 3.5" LCD → Raspberry Pi (SPI)
+### Waveshare 3.5" LCD (SPI)
 
-| LCD | Pi physical pin | Function |
+| LCD | Pi pin | What it's for |
 |---|---|---|
 | VCC | 2 | 5V power |
 | GND | 6 | Ground |
-| DIN | 19 | SPI MOSI (GPIO 10) |
-| CLK | 23 | SPI clock (GPIO 11) |
-| CS | 24 | Chip select (GPIO 8, CE0) |
-| DC | 22 | Data/command (GPIO 25) |
-| RST | 18 | Reset (GPIO 24) |
-| BL | 12 | Backlight (GPIO 18) |
+| DIN | 19 | Data in |
+| CLK | 23 | Clock |
+| CS | 24 | Chip select |
+| DC | 22 | Data/command |
+| RST | 18 | Reset |
+| BL | 12 | Backlight |
 
-Pin 6 is a single ground pin shared by both devices — any of the header's ground pins works if it is more convenient to route.
+Both devices share pin 6 for ground. Any of the header's ground pins will work.
 
 ---
 
 ## Setup
 
-**1. Enable the I²C and SPI buses.** Both are off by default on Raspberry Pi OS.
+**1. Turn on I²C and SPI.** Both are off by default.
 
 ```bash
 sudo raspi-config
-# Interface Options → I2C  → Enable
-# Interface Options → SPI  → Enable
+```
+
+Go to Interface Options, enable I2C, then enable SPI. Then reboot:
+
+```bash
 sudo reboot
 ```
 
-**2. Clone and create a virtual environment.** Raspberry Pi OS Bookworm blocks system-wide `pip install` (PEP 668), so a venv is required rather than optional.
+**2. Download the code and install what it needs.**
 
 ```bash
 git clone https://github.com/jzazhou/weather-station.git ~/weather_station
@@ -160,57 +128,53 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**3. Check that the LCD is mapped to `/dev/fb0`.** `display.py` writes to that device directly. Depending on how the Waveshare driver is installed, the SPI panel may come up as `/dev/fb1` instead, with `fb0` belonging to HDMI.
+The `venv` step creates a virtual environment — a separate folder for this project's libraries. Raspberry Pi OS requires this, it won't let you install packages system-wide.
+
+**3. Check the LCD.** The code writes to `/dev/fb0`. Confirm that's where the LCD is:
 
 ```bash
 ls /dev/fb*
-fbset -fb /dev/fb0 -i    # should report 480x320
+fbset -fb /dev/fb0 -i
 ```
 
-If the panel is on `fb1`, either point `FB_DEVICE` in `display.py` at it or run `fbcp` to mirror. Running `python display.py` should paint red, green, blue, white, then a gradient — if the colours appear in the wrong order, the ILI9486 controller is expecting a different byte order and the shifts in `rgb888_to_rgb565` need adjusting.
+That should report 480x320. If the LCD turns out to be `/dev/fb1` instead, change `FB_DEVICE` at the top of `display.py`.
 
-**4. Verify the sensor.**
-
-```bash
-i2cdetect -y 1
-```
+Then run `python display.py`. You should see red, green, blue, white, and a gradient.
 
 ---
 
 ## Configuration
 
-`config.py` holds the API key and is deliberately **not** committed. Copy the template and fill it in:
+The API key lives in `config.py`, which isn't in this repo. Make your own from the template:
 
 ```bash
 cp config.example.py config.py
 nano config.py
 ```
 
-| Setting | Meaning |
+| Setting | What it is |
 |---|---|
-| `OWM_API_KEY` | OpenWeatherMap API key — free tier is sufficient ([get one here](https://openweathermap.org/api)) |
-| `CITY_NAME` | City for outdoor readings, e.g. `"Ithaca"` |
-| `COUNTRY_CODE` | ISO country code, e.g. `"US"` |
-| `UNITS` | `"metric"` for °C and m/s |
-| `SENSOR_INTERVAL` | Seconds between sensor reads (default `10`) |
-| `API_INTERVAL` | Seconds between API calls (default `600`) |
+| `OWM_API_KEY` | Your [OpenWeatherMap](https://openweathermap.org/api) key (free tier is fine) |
+| `CITY_NAME` | City for outdoor weather |
+| `COUNTRY_CODE` | Country code, like `"US"` |
+| `UNITS` | `"metric"` for °C |
+| `SENSOR_INTERVAL` | Seconds between sensor reads (10) |
+| `API_INTERVAL` | Seconds between API calls (600) |
 
-A new OpenWeatherMap key takes up to a couple of hours to activate. A `401` immediately after signing up usually means the key is valid but not live yet.
-
-Keep `API_INTERVAL` at 600 or higher. The free tier allows 60 calls/minute and 1,000,000/month, so a 10-minute interval sits far inside the limit while still being fresher than the weather actually changes.
+A brand new API key can take a couple of hours to start working. If you get a `401` error right after signing up, that's usually why.
 
 ---
 
 ## Running it
 
-Manually, to watch the log output:
+To run it yourself and watch the output:
 
 ```bash
 source venv/bin/activate
 python station.py
 ```
 
-As a service, so it survives reboots and restarts itself if it crashes:
+To make it start on boot and restart itself if it crashes:
 
 ```bash
 sudo cp weather-station.service /etc/systemd/system/
@@ -219,36 +183,25 @@ sudo systemctl enable weather-station
 sudo systemctl start weather-station
 ```
 
-Check on it:
+Useful commands after that:
 
 ```bash
 systemctl status weather-station      # is it running?
-journalctl -u weather-station -f      # follow the live log
+journalctl -u weather-station -f      # watch the log
 ```
 
-The unit file assumes the project lives at `/home/pi/weather_station` and runs as user `pi`. If your username differs, edit `User=`, `WorkingDirectory=` and `ExecStart=` to match. `Restart=on-failure` with `RestartSec=5` means a transient crash brings the station back in five seconds instead of leaving a dark screen.
+The service file assumes the project is at `/home/pi/weather_station` and the user is `pi`. If yours is different, edit those paths in `weather-station.service`.
 
 ---
 
 ## Design notes
 
-**Drawing to the framebuffer directly.** `/dev/fb0` is a file that is the screen — bytes written to it become pixels. `display.py` converts Pillow's 24-bit RGB into the 16-bit RGB565 format the panel expects by discarding low-order bits from each channel and packing them into two bytes, using NumPy to do it across the whole array at once rather than pixel by pixel. Writing a full 480×320 frame is a single `write()` of 307,200 bytes. This is what lets the station run with no desktop environment at all, which saves both memory and boot time.
+**Three jobs running at the same time.** Reading the sensor, calling the API, and drawing the screen all happen at once rather than one after another. This matters because the API call can take up to 10 seconds when the network is slow — long enough to freeze the clock if the screen had to wait for it. The sensor and the API each run in their own thread and drop their results into a shared `DataStore`. That store uses a lock, so the drawing code never reads a value while it's halfway through being written.
 
-**Icons drawn in code.** `icons.py` builds every weather icon from Pillow primitives — the sun is a disc with eight tapered rays, the crescent moon is a disc with an offset disc punched out of it as fully transparent pixels. They are rendered at 4× and downsampled, which is a cheap way to get anti-aliased edges out of a library that does not anti-alias. Nothing is a bitmap asset, so an icon can be recoloured or resized by changing an argument.
+**Only redrawing when something changes.** The main loop checks 10 times a second, but drawing a frame means building a whole new 480×320 image and sending 307,200 bytes to the screen. Most of the time nothing has actually changed — the clock only shows hours and minutes, so it updates once a minute. Before drawing, the loop compares the current minute and the two update timestamps against the last frame it drew. If they match, the new frame would look identical, so it skips it. That's about 3 redraws a minute instead of 600.
 
-**A theme file with one job.** Colours and fonts live in `theme.py` and nowhere else. Restyling the entire interface means editing one 41-line file — the layout code never names a colour literal.
-
-**Designing without the hardware.** `ui.py` renders from a sample dictionary and writes `preview.png` when run directly, so the visual design could be iterated on a laptop in seconds rather than by redeploying to the Pi. That preview is the image at the top of this README.
-
-**Every field can be `None`.** At boot, before the first sensor read lands, and during any outage, `None` is the truthful value — so the layout is written to survive it everywhere rather than assuming data exists.
+**Writing straight to the screen.** On Linux, the display is a file: `/dev/fb0`. Whatever bytes you write to it become pixels. Pillow makes images with 3 bytes per pixel, but the LCD's controller wants 2 bytes per pixel in a format called RGB565 — 5 bits of red, 6 of green, 5 of blue. `display.py` converts between them with bit shifts, using NumPy so all 153,600 pixels are converted at once instead of in a loop. Doing it this way means the Pi needs no desktop environment at all.
 
 ---
 
-## Roadmap
-
-- **DHT22 as a fallback sensor** — wired to a single GPIO pin, to cross-check the BME688 and keep temperature and humidity on screen if the I²C sensor drops out
-- **Custom enclosure** — to be designed in Tinkercad and 3D printed, matching the UI's palette and rounded geometry
-- **Historical logging** — persist readings to SQLite and add a 24-hour sparkline to each card
-- **Pressure-trend indicator** — rising/falling arrow from the pressure history, a genuinely useful short-term forecast signal
-- **Hardware backlight dimming** — PWM on the BL pin (GPIO 18) instead of the current software brightness multiply, for real power savings overnight
-- **Multi-screen rotation** — a forecast view and an air-quality-history view, cycling on a timer
+Built by a first-year Electrical and Computer Engineering student at Cornell University.
