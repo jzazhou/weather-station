@@ -1,6 +1,6 @@
 # Weather Station
 
-A always-on desktop weather station built on a Raspberry Pi 4 — indoor air readings from a Bosch BME688 sensor, outdoor conditions from the OpenWeatherMap API, drawn to a 3.5" SPI LCD through a hand-built Pillow UI with no GUI framework underneath.
+A always-on desktop weather station built on a Raspberry Pi 4 — indoor air readings from a Bosch BME688 sensor, outdoor conditions from the OpenWeatherMap API, drawn to a 3.5" SPI LCD through Pillow UI.
 
 ![The weather station UI](preview.png)
 
