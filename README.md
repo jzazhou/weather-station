@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/31809488/README.md)
 # Weather Station
 
 An always-on desktop weather station built on a Raspberry Pi 4. It reads indoor air conditions from a Bosch BME688 sensor, pulls outdoor weather from the OpenWeatherMap API, and shows both on a small colour LCD.
