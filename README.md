@@ -4,7 +4,7 @@ An always-on desktop weather station built on a Raspberry Pi 4. It reads indoor 
 
 ![The weather station UI](preview.png)
 
-The interface is drawn from scratch using Pillow UI due to outdated Waveshare. 
+The interface is drawn from scratch using Pillow UI due to outdated Waveshare driver script. 
 
 ---
 
