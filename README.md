@@ -200,7 +200,3 @@ The service file assumes the project is at `/home/pi/weather_station` and the us
 **Only redrawing when something changes.** The main loop checks 10 times a second, but drawing a frame means building a whole new 480×320 image and sending 307,200 bytes to the screen. Most of the time nothing has actually changed — the clock only shows hours and minutes, so it updates once a minute. Before drawing, the loop compares the current minute and the two update timestamps against the last frame it drew. If they match, the new frame would look identical, so it skips it. That's about 3 redraws a minute instead of 600.
 
 **Writing straight to the screen.** On Linux, the display is a file: `/dev/fb0`. Whatever bytes you write to it become pixels. Pillow makes images with 3 bytes per pixel, but the LCD's controller wants 2 bytes per pixel in a format called RGB565 — 5 bits of red, 6 of green, 5 of blue. `display.py` converts between them with bit shifts, using NumPy so all 153,600 pixels are converted at once instead of in a loop. Doing it this way means the Pi needs no desktop environment at all.
-
----
-
-Built by a first-year Electrical and Computer Engineering student at Cornell University.
